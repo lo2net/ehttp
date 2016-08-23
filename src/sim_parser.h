@@ -12,7 +12,7 @@
 #include <sstream>
 #include <map>
 #include <vector>
-#include <sys/time.h>
+//#include <sys/time.h>
 
 #include "json/json.h"
 #include "simple_log.h"

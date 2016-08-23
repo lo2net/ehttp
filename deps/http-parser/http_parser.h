@@ -29,7 +29,7 @@ extern "C" {
 #define HTTP_PARSER_VERSION_MINOR 6
 #define HTTP_PARSER_VERSION_PATCH 0
 
-#include <sys/types.h>
+    //#include <sys/types.h>
 #if defined(_WIN32) && !defined(__MINGW32__) && \
   (!defined(_MSC_VER) || _MSC_VER<1600) && !defined(__WINE__)
 #include <BaseTsd.h>
@@ -325,7 +325,8 @@ size_t http_parser_execute(http_parser *parser,
 int http_should_keep_alive(const http_parser *parser);
 
 /* Returns a string version of the HTTP method. */
-const char *http_method_str(enum http_method m);
+    //const char *http_method_str(enum http_method m);
+const char *http_method_str(int m);
 
 /* Return a string name of the given error */
 const char *http_errno_name(enum http_errno err);

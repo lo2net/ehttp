@@ -18,17 +18,18 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-PLATFORM ?= $(shell sh -c 'uname -s | tr "[A-Z]" "[a-z]"')
-HELPER ?=
-BINEXT ?=
-SONAME ?= libhttp_parser.so.2.6.0
-SOEXT ?= so
+#PLATFORM ?= $(shell sh -c 'uname -s | tr "[A-Z]" "[a-z]"')
 
-CC?=gcc
-AR?=ar
+#CC?=gcc
+CC=cl.exe
+#AR?=ar
+AR=lib.exe
 
-CPPFLAGS ?= -g
-LDFLAGS ?=
+LD=link.exe
+
+#CPPFLAGS ?= -g
+#CPPFLAGS ?= -c -MD -Zi -EHsc -GR -DWIN32 -DWIN64 -D_WIN64 -TP -bigobj -Gs -Gy -GF -DWINDOWS -D_AMD64
+CPPFLAGS ?= -c -MD -Zi -EHsc -GR -DWIN32 -DWIN64 -D_WIN64 -TP
 
 CPPFLAGS += -I.
 CPPFLAGS_DEBUG = $(CPPFLAGS) -DHTTP_PARSER_STRICT=1
@@ -37,104 +38,119 @@ CPPFLAGS_FAST = $(CPPFLAGS) -DHTTP_PARSER_STRICT=0
 CPPFLAGS_FAST += $(CPPFLAGS_FAST_EXTRA)
 CPPFLAGS_BENCH = $(CPPFLAGS_FAST)
 
-CFLAGS += -Wall -Wextra -Werror
-CFLAGS_DEBUG = $(CFLAGS) -O0 -g $(CFLAGS_DEBUG_EXTRA)
-CFLAGS_FAST = $(CFLAGS) -O3 $(CFLAGS_FAST_EXTRA)
-CFLAGS_BENCH = $(CFLAGS_FAST) -Wno-unused-parameter
-CFLAGS_LIB = $(CFLAGS_FAST) -fPIC
+#CFLAGS += -Wall -Wextra -Werror
+#CFLAGS_DEBUG = $(CFLAGS) -O0 -g $(CFLAGS_DEBUG_EXTRA)
+#CFLAGS_FAST = $(CFLAGS) -O3 $(CFLAGS_FAST_EXTRA)
+#CFLAGS_BENCH = $(CFLAGS_FAST) -Wno-unused-parameter
+#CFLAGS_LIB = $(CFLAGS_FAST) -fPIC
 
-LDFLAGS_LIB = $(LDFLAGS) -shared
+#LDFLAGS ?=
+LDFLAGS ?= -debug
+#LDFLAGS_LIB = $(LDFLAGS) -shared
+LDFLAGS_SHARED = $(LDFLAGS) -dll
+#LDFLAGS_EXE = $(LDFLAGS) -subsystem:console -debug /OPT:ICF /OPT:REF -DYNAMICBASE -NXCOMPAT advapi32.lib
+LDFLAGS_EXE = $(LDFLAGS) -subsystem:console
+
+HELPER ?=
+#SONAME ?= libhttp_parser.so.2.6.0
+LIBNAME_SHARED ?= http_parser.dll
+LIBNAME_STATIC ?= http_parser.lib
+#SOEXT ?= so
 
 INSTALL ?= install
-PREFIX ?= $(DESTDIR)/usr/local
-LIBDIR = $(PREFIX)/lib
+DESTDIR ?= ./output
+PREFIX ?= $(DESTDIR)
+LIBDIR_SHARED = $(PREFIX)/shared_lib
+LIBDIR_STATIC = $(PREFIX)/static_lib
 INCLUDEDIR = $(PREFIX)/include
 
-ifneq (darwin,$(PLATFORM))
+##ifneq (darwin,$(PLATFORM))
 # TODO(bnoordhuis) The native SunOS linker expects -h rather than -soname...
-LDFLAGS_LIB += -Wl,-soname=$(SONAME)
-endif
+#LDFLAGS_LIB += -Wl,-soname=$(SONAME)
+##endif
 
-test: test_g test_fast
-	$(HELPER) ./test_g$(BINEXT)
-	$(HELPER) ./test_fast$(BINEXT)
+all: test-run library_shared library_static
 
-test_g: http_parser_g.o test_g.o
-	$(CC) $(CFLAGS_DEBUG) $(LDFLAGS) http_parser_g.o test_g.o -o $@
+test_g.exe: http_parser_g.o test_g.o
+	$(LD) $(LDFLAGS_EXE) $^ -out:$@
+	mt.exe -manifest $@.manifest -outputresource:'$@;1'
+test_g.o: test.c http_parser.h
+	$(CC) $(CPPFLAGS_DEBUG) test.c -Fo$@
+http_parser_g.o: http_parser.c http_parser.h
+	$(CC) $(CPPFLAGS_DEBUG) http_parser.c -Fo$@
+test_fast.exe: http_parser.o test.o
+	$(LD) $(LDFLAGS_EXE) $^ -out:$@
+	mt.exe -manifest $@.manifest -outputresource:'$@;1'
+test.o: test.c http_parser.h
+	$(CC) $(CPPFLAGS_FAST) test.c -Fo$@
+http_parser.o: http_parser.c http_parser.h
+	$(CC) $(CPPFLAGS_FAST) http_parser.c -Fo$@
 
-test_g.o: test.c http_parser.h Makefile
-	$(CC) $(CPPFLAGS_DEBUG) $(CFLAGS_DEBUG) -c test.c -o $@
+bench.exe: http_parser.o bench.o
+	$(LD) $(LDFLAGS_EXE) http_parser.o bench.o -out:$@
+	mt.exe -manifest $@.manifest -outputresource:'$@;1'
+bench.o: bench.c http_parser.h
+	$(CC) $(CPPFLAGS_BENCH) bench.c -Fo$@
 
-http_parser_g.o: http_parser.c http_parser.h Makefile
-	$(CC) $(CPPFLAGS_DEBUG) $(CFLAGS_DEBUG) -c http_parser.c -o $@
+test-run: test_g.exe test_fast.exe
+	$(HELPER) ./test_g.exe
+	$(HELPER) ./test_fast.exe
+test-run-timed: test_fast.exe
+	while(true) do time $(HELPER) ./test_fast.exe > /dev/null; done
+#test-valgrind: test_g.exe
+#	valgrind ./test_g.exe
 
-test_fast: http_parser.o test.o http_parser.h
-	$(CC) $(CFLAGS_FAST) $(LDFLAGS) http_parser.o test.o -o $@
+url_parser.o: contrib/url_parser.c http_parser.h
+	$(CC) $(CPPFLAGS_FAST) contrib/url_parser.c -Fo$@
+url_parser.exe: http_parser.o url_parser.o
+	$(LD) $(LDFLAGS_EXE) $^ -out:$@
+	mt.exe -manifest $@.manifest -outputresource:'$@;1'
+url_parser_g.exe: http_parser_g.o url_parser.o
+	$(LD) $(LDFLAGS_EXE) $^ -out:$@
+	mt.exe -manifest $@.manifest -outputresource:'$@;1'
 
-test.o: test.c http_parser.h Makefile
-	$(CC) $(CPPFLAGS_FAST) $(CFLAGS_FAST) -c test.c -o $@
+parsertrace.o: contrib/parsertrace.c http_parser.h
+	$(CC) $(CPPFLAGS_FAST) contrib/parsertrace.c -Fo$@
+parsertrace.exe: http_parser.o parsertrace.o
+	$(LD) $(LDFLAGS_EXE) $^ -out:$@
+	mt.exe -manifest $@.manifest -outputresource:'$@;1'
+parsertrace_g.exe: http_parser_g.o parsertrace.o
+	$(LD) $(LDFLAGS_EXE) $^ -out:$@
+	mt.exe -manifest $@.manifest -outputresource:'$@;1'
 
-bench: http_parser.o bench.o
-	$(CC) $(CFLAGS_BENCH) $(LDFLAGS) http_parser.o bench.o -o $@
-
-bench.o: bench.c http_parser.h Makefile
-	$(CC) $(CPPFLAGS_BENCH) $(CFLAGS_BENCH) -c bench.c -o $@
-
-http_parser.o: http_parser.c http_parser.h Makefile
-	$(CC) $(CPPFLAGS_FAST) $(CFLAGS_FAST) -c http_parser.c
-
-test-run-timed: test_fast
-	while(true) do time $(HELPER) ./test_fast$(BINEXT) > /dev/null; done
-
-test-valgrind: test_g
-	valgrind ./test_g
-
-libhttp_parser.o: http_parser.c http_parser.h Makefile
-	$(CC) $(CPPFLAGS_FAST) $(CFLAGS_LIB) -c http_parser.c -o libhttp_parser.o
-
-library: libhttp_parser.o
-	$(CC) $(LDFLAGS_LIB) -o $(SONAME) $<
-
-package: http_parser.o
-	$(AR) rcs libhttp_parser.a http_parser.o
-
-url_parser: http_parser.o contrib/url_parser.c
-	$(CC) $(CPPFLAGS_FAST) $(CFLAGS_FAST) $^ -o $@
-
-url_parser_g: http_parser_g.o contrib/url_parser.c
-	$(CC) $(CPPFLAGS_DEBUG) $(CFLAGS_DEBUG) $^ -o $@
-
-parsertrace: http_parser.o contrib/parsertrace.c
-	$(CC) $(CPPFLAGS_FAST) $(CFLAGS_FAST) $^ -o parsertrace$(BINEXT)
-
-parsertrace_g: http_parser_g.o contrib/parsertrace.c
-	$(CC) $(CPPFLAGS_DEBUG) $(CFLAGS_DEBUG) $^ -o parsertrace_g$(BINEXT)
+#libhttp_parser.o: http_parser.c http_parser.h
+#	$(CC) $(CPPFLAGS_FAST) http_parser.c -Folibhttp_parser.o
+library_shared: http_parser.o
+	$(LD) $(LDFLAGS_SHARED) -out:$(LIBNAME_SHARED) $<
+	mt.exe -manifest $(LIBNAME_SHARED).manifest -outputresource:'$(LIBNAME_SHARED);2'
+library_static: http_parser.o
+	$(AR) /out:$(LIBNAME_STATIC) $<
 
 tags: http_parser.c http_parser.h test.c
-	ctags $^
+#	ctags $^
 
-install: library
+install: library_shared library_static
 	$(INSTALL) -D  http_parser.h $(INCLUDEDIR)/http_parser.h
-	$(INSTALL) -D $(SONAME) $(LIBDIR)/$(SONAME)
-	ln -s $(LIBDIR)/$(SONAME) $(LIBDIR)/libhttp_parser.$(SOEXT)
+	$(INSTALL) -D $(LIBNAME_SHARED) $(LIBDIR_SHARED)/$(LIBNAME_SHARED)
+	$(INSTALL) -D $(LIBNAME_STATIC) $(LIBDIR_STATIC)/$(LIBNAME_STATIC)
 
-install-strip: library
-	$(INSTALL) -D  http_parser.h $(INCLUDEDIR)/http_parser.h
-	$(INSTALL) -D -s $(SONAME) $(LIBDIR)/$(SONAME)
-	ln -s $(LIBDIR)/$(SONAME) $(LIBDIR)/libhttp_parser.$(SOEXT)
+install-strip: library_shared library_static
+#	$(INSTALL) -D  http_parser.h $(INCLUDEDIR)/http_parser.h
+#	$(INSTALL) -D -s $(SONAME) $(LIBDIR)/$(SONAME)
 
 uninstall:
-	rm $(INCLUDEDIR)/http_parser.h
-	rm $(LIBDIR)/$(SONAME)
-	rm $(LIBDIR)/libhttp_parser.so
+	rm -rf $(INCLUDEDIR)/http_parser.h
+	rm -rf $(LIBDIR_SHARED)/$(LIBNAME_SHARED)
+	rm -rf $(LIBDIR_STATIC)/$(LIBNAME_STATIC)
 
 clean:
-	rm -f *.o *.a tags test test_fast test_g \
-		http_parser.tar libhttp_parser.so.* \
-		url_parser url_parser_g parsertrace parsertrace_g \
-		*.exe *.exe.so
+	rm -rf *.exp *.ilk *.manifest *.lib *.pdb *.o tags
+	rm -rf $(LIBNAME_SHARED) $(LIBNAME_STATIC)
+	rm -rf test_fast.exe test_g.exe url_parser.exe url_parser_g.exe
+	rm -rf parsertrace parsertrace_g.exe
+	rm -rf $(DESTDIR)
 
-contrib/url_parser.c:	http_parser.h
-contrib/parsertrace.c:	http_parser.h
+#contrib/url_parser.c:	http_parser.h
+#contrib/parsertrace.c:	http_parser.h
 
-.PHONY: clean package test-run test-run-timed test-valgrind install install-strip uninstall
+.PHONY: all clean library_shared library_static test-run test-run-timed test-valgrind install install-strip uninstall

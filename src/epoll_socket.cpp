@@ -1,296 +1,300 @@
-/*
- * tcp_epoll.cpp
- *
- *  Created on: Nov 10, 2014
- *      Author: liao
- */
-#include <cstdlib>
-#include <climits>
-#include <cstdio>
-#include <cerrno>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/epoll.h>
-#include <sys/fcntl.h>
-#include <sys/sysinfo.h>
-#include <unistd.h>
+//
+// refer to iocp_socket.cpp
+//
 
-#include "simple_log.h"
-#include "epoll_socket.h"
+// /*
+//  * tcp_epoll.cpp
+//  *
+//  *  Created on: Nov 10, 2014
+//  *      Author: liao
+//  */
+// #include <cstdlib>
+// #include <climits>
+// #include <cstdio>
+// #include <cerrno>
+// #include <netinet/in.h>
+// #include <arpa/inet.h>
+// #include <sys/socket.h>
+// #include <sys/time.h>
+// #include <sys/epoll.h>
+// #include <sys/fcntl.h>
+// #include <sys/sysinfo.h>
+// #include <unistd.h>
 
-EpollSocket::EpollSocket() {
-    _thread_pool = NULL;
-    _use_default_tp = true;
-}
+// #include "simple_log.h"
+// #include "epoll_socket.h"
 
-EpollSocket::~EpollSocket() {
-    if (_thread_pool != NULL && _use_default_tp) {
-        delete _thread_pool;
-        _thread_pool = NULL;
-    }
-}
+// EpollSocket::EpollSocket() {
+//     _thread_pool = NULL;
+//     _use_default_tp = true;
+// }
 
-int EpollSocket::setNonblocking(int fd) {
-    int flags;
+// EpollSocket::~EpollSocket() {
+//     if (_thread_pool != NULL && _use_default_tp) {
+//         delete _thread_pool;
+//         _thread_pool = NULL;
+//     }
+// }
 
-    if (-1 == (flags = fcntl(fd, F_GETFL, 0)))
-        flags = 0;
-    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-};
+// int EpollSocket::setNonblocking(int fd) {
+//     int flags;
 
-int EpollSocket::bind_on(unsigned int ip) {
-    /* listen on sock_fd, new connection on new_fd */
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
-        LOG_ERROR("socket error:%s", strerror(errno));
-        return -1;
-    }
-    int opt = 1;
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+//     if (-1 == (flags = fcntl(fd, F_GETFL, 0)))
+//         flags = 0;
+//     return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+// };
 
-    struct sockaddr_in my_addr; /* my address information */
-    memset (&my_addr, 0, sizeof(my_addr));
-    my_addr.sin_family = AF_INET; /* host byte order */
-    my_addr.sin_port = htons(_port); /* short, network byte order */
-    my_addr.sin_addr.s_addr = ip;
+// int EpollSocket::bind_on(unsigned int ip) {
+//     /* listen on sock_fd, new connection on new_fd */
+//     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+//     if (sockfd == -1) {
+//         LOG_ERROR("socket error:%s", strerror(errno));
+//         return -1;
+//     }
+//     int opt = 1;
+//     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    if (bind(sockfd, (struct sockaddr *) &my_addr, sizeof(struct sockaddr)) == -1) {
-        LOG_ERROR("bind error:%s", strerror(errno));
-        return -1;
-    }
-    if (listen(sockfd, _backlog) == -1) {
-        LOG_ERROR("listen error:%s", strerror(errno));
-        return -1;
-    }
-    _listen_sockets.insert(sockfd);
-    return 0;
-}
+//     struct sockaddr_in my_addr; /* my address information */
+//     memset (&my_addr, 0, sizeof(my_addr));
+//     my_addr.sin_family = AF_INET; /* host byte order */
+//     my_addr.sin_port = htons(_port); /* short, network byte order */
+//     my_addr.sin_addr.s_addr = ip;
 
-int EpollSocket::listen_on() {
-    if (_bind_ips.empty()) {
-        int ret = bind_on(INADDR_ANY); /* auto-fill with my IP */
-        if (ret != 0) {
-            return ret;
-        }
-        LOG_INFO("bind for all ip (0.0.0.0)!");
-    } else {
-        for (size_t i = 0; i < _bind_ips.size(); i++) {
-            unsigned ip = inet_addr(_bind_ips[i].c_str());
-            int ret = bind_on(ip);
-            if (ret != 0) {
-                return ret;
-            }
-            LOG_INFO("bind for ip:%s success", _bind_ips[i].c_str());
-        }
-    }
+//     if (bind(sockfd, (struct sockaddr *) &my_addr, sizeof(struct sockaddr)) == -1) {
+//         LOG_ERROR("bind error:%s", strerror(errno));
+//         return -1;
+//     }
+//     if (listen(sockfd, _backlog) == -1) {
+//         LOG_ERROR("listen error:%s", strerror(errno));
+//         return -1;
+//     }
+//     _listen_sockets.insert(sockfd);
+//     return 0;
+// }
 
-    LOG_INFO("start Server Socket on port : %d", _port);
-    return 0;
-}
+// int EpollSocket::listen_on() {
+//     if (_bind_ips.empty()) {
+//         int ret = bind_on(INADDR_ANY); /* auto-fill with my IP */
+//         if (ret != 0) {
+//             return ret;
+//         }
+//         LOG_INFO("bind for all ip (0.0.0.0)!");
+//     } else {
+//         for (size_t i = 0; i < _bind_ips.size(); i++) {
+//             unsigned ip = inet_addr(_bind_ips[i].c_str());
+//             int ret = bind_on(ip);
+//             if (ret != 0) {
+//                 return ret;
+//             }
+//             LOG_INFO("bind for ip:%s success", _bind_ips[i].c_str());
+//         }
+//     }
 
-int EpollSocket::accept_socket(int sockfd, std::string &client_ip) {
-    int new_fd;
-    struct sockaddr_in their_addr; /* connector's address information */
-    socklen_t sin_size = sizeof(struct sockaddr_in);
+//     LOG_INFO("start Server Socket on port : %d", _port);
+//     return 0;
+// }
 
-    if ((new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size)) == -1) {
-        LOG_ERROR("accept error:%s", strerror(errno));
-        return -1;
-    }
+// int EpollSocket::accept_socket(int sockfd, std::string &client_ip) {
+//     int new_fd;
+//     struct sockaddr_in their_addr; /* connector's address information */
+//     socklen_t sin_size = sizeof(struct sockaddr_in);
 
-    client_ip = inet_ntoa(their_addr.sin_addr);
-    LOG_DEBUG("server: got connection from %s\n", client_ip.c_str());
-    return new_fd;
-}
+//     if ((new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size)) == -1) {
+//         LOG_ERROR("accept error:%s", strerror(errno));
+//         return -1;
+//     }
 
-int EpollSocket::handle_accept_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_handler) {
-    int sockfd = event.data.fd;
+//     client_ip = inet_ntoa(their_addr.sin_addr);
+//     LOG_DEBUG("server: got connection from %s\n", client_ip.c_str());
+//     return new_fd;
+// }
 
-    std::string client_ip;
-    int conn_sock = accept_socket(sockfd, client_ip);
-    if (conn_sock == -1) {
-        return -1;
-    }
-    setNonblocking(conn_sock);
-    LOG_DEBUG("get accept socket which listen fd:%d, conn_sock_fd:%d", sockfd, conn_sock);
+// int EpollSocket::handle_accept_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_handler) {
+//     int sockfd = event.data.fd;
 
-    EpollContext *epoll_context = new EpollContext();
-    epoll_context->fd = conn_sock;
-    epoll_context->client_ip = client_ip;
+//     std::string client_ip;
+//     int conn_sock = accept_socket(sockfd, client_ip);
+//     if (conn_sock == -1) {
+//         return -1;
+//     }
+//     setNonblocking(conn_sock);
+//     LOG_DEBUG("get accept socket which listen fd:%d, conn_sock_fd:%d", sockfd, conn_sock);
 
-    socket_handler.on_accept(*epoll_context);
+//     EpollContext *epoll_context = new EpollContext();
+//     epoll_context->fd = conn_sock;
+//     epoll_context->client_ip = client_ip;
 
-    struct epoll_event conn_sock_ev;
-    conn_sock_ev.events = EPOLLIN | EPOLLONESHOT;
-    conn_sock_ev.data.ptr = epoll_context;
+//     socket_handler.on_accept(*epoll_context);
 
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, conn_sock, &conn_sock_ev) == -1) {
-        LOG_ERROR("epoll_ctl: conn_sock:%s", strerror(errno));
-        close_and_release(epollfd, event, socket_handler);
-        return -1;
-    }
+//     struct epoll_event conn_sock_ev;
+//     conn_sock_ev.events = EPOLLIN | EPOLLONESHOT;
+//     conn_sock_ev.data.ptr = epoll_context;
 
-    return 0;
-}
+//     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, conn_sock, &conn_sock_ev) == -1) {
+//         LOG_ERROR("epoll_ctl: conn_sock:%s", strerror(errno));
+//         close_and_release(epollfd, event, socket_handler);
+//         return -1;
+//     }
 
-int EpollSocket::handle_readable_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_handler) {
-    Task rt;
-    rt.epollfd = epollfd;
-    rt.event = event;
-    rt.watcher = &socket_handler;
+//     return 0;
+// }
 
-    LOG_DEBUG("start handle readable event");
-    int ret = _thread_pool->add_task(rt);
-    if (ret != 0) {
-        LOG_WARN("add read task fail:%d, we will close connect.", ret);
-        close_and_release(epollfd, event, socket_handler);
-    }
-    return ret;
-    /*
-    TaskData tdata;
-    tdata.epollfd = epollfd;
-    tdata.event = event;
-    tdata.watcher = &socket_handler;
-    read_func(&tdata);
-    return 0;
-    */
-}
+// int EpollSocket::handle_readable_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_handler) {
+//     Task rt;
+//     rt.epollfd = epollfd;
+//     rt.event = event;
+//     rt.watcher = &socket_handler;
 
-void write_func(void *data) {
-    TaskData *tdata = (TaskData *)data;
-    int epollfd = tdata->epollfd;
-    epoll_event event = (tdata->event);
-    EpollSocketWatcher &socket_handler = *(tdata->watcher);
+//     LOG_DEBUG("start handle readable event");
+//     int ret = _thread_pool->add_task(rt);
+//     if (ret != 0) {
+//         LOG_WARN("add read task fail:%d, we will close connect.", ret);
+//         close_and_release(epollfd, event, socket_handler);
+//     }
+//     return ret;
+//     /*
+//     TaskData tdata;
+//     tdata.epollfd = epollfd;
+//     tdata.event = event;
+//     tdata.watcher = &socket_handler;
+//     read_func(&tdata);
+//     return 0;
+//     */
+// }
 
-    EpollContext *epoll_context = (EpollContext *) event.data.ptr;
-    int fd = epoll_context->fd;
-    LOG_DEBUG("start write data");
+// void write_func(void *data) {
+//     TaskData *tdata = (TaskData *)data;
+//     int epollfd = tdata->epollfd;
+//     epoll_event event = (tdata->event);
+//     EpollSocketWatcher &socket_handler = *(tdata->watcher);
 
-    int ret = socket_handler.on_writeable(*epoll_context);
-    if(ret == WRITE_CONN_CLOSE) {
-        close_and_release(epollfd, event, socket_handler);
-        return;
-    }
+//     EpollContext *epoll_context = (EpollContext *) event.data.ptr;
+//     int fd = epoll_context->fd;
+//     LOG_DEBUG("start write data");
 
-    if (ret == WRITE_CONN_CONTINUE) {
-        event.events = EPOLLOUT | EPOLLONESHOT;
-    } else {
-        event.events = EPOLLIN | EPOLLONESHOT;
-    }
-    epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &event);
-}
+//     int ret = socket_handler.on_writeable(*epoll_context);
+//     if(ret == WRITE_CONN_CLOSE) {
+//         close_and_release(epollfd, event, socket_handler);
+//         return;
+//     }
 
-int EpollSocket::handle_writeable_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_handler) {
-    TaskData tdata;
-    tdata.epollfd = epollfd;
-    tdata.event = event;
-    tdata.watcher = &socket_handler;
+//     if (ret == WRITE_CONN_CONTINUE) {
+//         event.events = EPOLLOUT | EPOLLONESHOT;
+//     } else {
+//         event.events = EPOLLIN | EPOLLONESHOT;
+//     }
+//     epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &event);
+// }
+
+// int EpollSocket::handle_writeable_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_handler) {
+//     TaskData tdata;
+//     tdata.epollfd = epollfd;
+//     tdata.event = event;
+//     tdata.watcher = &socket_handler;
     
-    write_func(&tdata);
+//     write_func(&tdata);
 
-    return 0;
-}
+//     return 0;
+// }
 
-void EpollSocket::set_thread_pool(ThreadPool *tp) {
-    this->_thread_pool = tp;
-    _use_default_tp = false;
-}
+// void EpollSocket::set_thread_pool(ThreadPool *tp) {
+//     this->_thread_pool = tp;
+//     _use_default_tp = false;
+// }
 
-int EpollSocket::start_epoll(int port, EpollSocketWatcher &socket_handler, int backlog, int max_events) {
-    _backlog = backlog;
-    _port = port;
+// int EpollSocket::start_epoll(int port, EpollSocketWatcher &socket_handler, int backlog, int max_events) {
+//     _backlog = backlog;
+//     _port = port;
 
-    if (_thread_pool == NULL) {
-        int core_size = get_nprocs();
-        LOG_INFO("thread pool not set, we will build for core size:%d", core_size);
-        _thread_pool = new ThreadPool();
-        _thread_pool->set_pool_size(core_size);
-    }
-    int ret = _thread_pool->start();
-    if (ret != 0) {
-        LOG_ERROR("thread pool start error:%d", ret);
-        return ret;
-    }
-    ret = this->listen_on();
-    if (ret != 0) {
-        return ret;
-    }
+//     if (_thread_pool == NULL) {
+//         int core_size = get_nprocs();
+//         LOG_INFO("thread pool not set, we will build for core size:%d", core_size);
+//         _thread_pool = new ThreadPool();
+//         _thread_pool->set_pool_size(core_size);
+//     }
+//     int ret = _thread_pool->start();
+//     if (ret != 0) {
+//         LOG_ERROR("thread pool start error:%d", ret);
+//         return ret;
+//     }
+//     ret = this->listen_on();
+//     if (ret != 0) {
+//         return ret;
+//     }
 
-    // The "size" parameter is a hint specifying the number of file
-    // descriptors to be associated with the new instance.
-    int epollfd = epoll_create(1024);
-    if (epollfd == -1) {
-        LOG_ERROR("epoll_create:%s", strerror(errno));
-        return -1;
-    }
+//     // The "size" parameter is a hint specifying the number of file
+//     // descriptors to be associated with the new instance.
+//     int epollfd = epoll_create(1024);
+//     if (epollfd == -1) {
+//         LOG_ERROR("epoll_create:%s", strerror(errno));
+//         return -1;
+//     }
 
-    for (std::set<int>::iterator i = _listen_sockets.begin(); i != _listen_sockets.end(); i++) {
-        int sockfd = *i;
-        struct epoll_event ev;
-        ev.events = EPOLLIN;
-        ev.data.fd = sockfd;
-        if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
-            LOG_ERROR("epoll_ctl: listen_sock:%s", strerror(errno));
-            return -1;
-        }
-    }
+//     for (std::set<int>::iterator i = _listen_sockets.begin(); i != _listen_sockets.end(); i++) {
+//         int sockfd = *i;
+//         struct epoll_event ev;
+//         ev.events = EPOLLIN;
+//         ev.data.fd = sockfd;
+//         if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
+//             LOG_ERROR("epoll_ctl: listen_sock:%s", strerror(errno));
+//             return -1;
+//         }
+//     }
 
-    epoll_event *events = new epoll_event[max_events];
-    while (1) {
-        int fds_num = epoll_wait(epollfd, events, max_events, -1);
-        if (fds_num == -1) {
-            if (errno == EINTR) { /*The call was interrupted by a signal handler*/
-                continue;
-            }
-            LOG_ERROR("epoll_pwait:%s", strerror(errno));
-            break;
-        }
+//     epoll_event *events = new epoll_event[max_events];
+//     while (1) {
+//         int fds_num = epoll_wait(epollfd, events, max_events, -1);
+//         if (fds_num == -1) {
+//             if (errno == EINTR) { /*The call was interrupted by a signal handler*/
+//                 continue;
+//             }
+//             LOG_ERROR("epoll_pwait:%s", strerror(errno));
+//             break;
+//         }
 
-        for (int i = 0; i < fds_num; i++) {
-            if(_listen_sockets.count(events[i].data.fd)) {
-                // accept connection
-                this->handle_accept_event(epollfd, events[i], socket_handler);
-            } else if(events[i].events & EPOLLIN ){
-                // readable
-                this->handle_readable_event(epollfd, events[i], socket_handler);
-            } else if(events[i].events & EPOLLOUT) {
-                // writeable
-                this->handle_writeable_event(epollfd, events[i], socket_handler);
-            } else {
-                LOG_INFO("unkonw events :%d", events[i].events);
-            }
-        }
-    }
-    if (events != NULL) {
-        delete[] events;
-        events = NULL;
-    }
-    return -1;
-}
+//         for (int i = 0; i < fds_num; i++) {
+//             if(_listen_sockets.count(events[i].data.fd)) {
+//                 // accept connection
+//                 this->handle_accept_event(epollfd, events[i], socket_handler);
+//             } else if(events[i].events & EPOLLIN ){
+//                 // readable
+//                 this->handle_readable_event(epollfd, events[i], socket_handler);
+//             } else if(events[i].events & EPOLLOUT) {
+//                 // writeable
+//                 this->handle_writeable_event(epollfd, events[i], socket_handler);
+//             } else {
+//                 LOG_INFO("unkonw events :%d", events[i].events);
+//             }
+//         }
+//     }
+//     if (events != NULL) {
+//         delete[] events;
+//         events = NULL;
+//     }
+//     return -1;
+// }
 
-int close_and_release(int &epollfd, epoll_event &epoll_event, EpollSocketWatcher &socket_handler) {
-    if (epoll_event.data.ptr == NULL) {
-        return 0;
-    }
-    LOG_DEBUG("connect close");
+// int close_and_release(int &epollfd, epoll_event &epoll_event, EpollSocketWatcher &socket_handler) {
+//     if (epoll_event.data.ptr == NULL) {
+//         return 0;
+//     }
+//     LOG_DEBUG("connect close");
 
-    EpollContext *hc = (EpollContext *) epoll_event.data.ptr;
-    socket_handler.on_close(*hc);
+//     EpollContext *hc = (EpollContext *) epoll_event.data.ptr;
+//     socket_handler.on_close(*hc);
 
-    int fd = hc->fd;
-    epoll_event.events = EPOLLIN | EPOLLOUT;
-    epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, &epoll_event);
+//     int fd = hc->fd;
+//     epoll_event.events = EPOLLIN | EPOLLOUT;
+//     epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, &epoll_event);
 
-    delete (EpollContext *) epoll_event.data.ptr;
-    epoll_event.data.ptr = NULL;
+//     delete (EpollContext *) epoll_event.data.ptr;
+//     epoll_event.data.ptr = NULL;
 
-    int ret = close(fd);
-    LOG_DEBUG("connect close complete which fd:%d, ret:%d", fd, ret);
-    return ret;
-}
+//     int ret = close(fd);
+//     LOG_DEBUG("connect close complete which fd:%d, ret:%d", fd, ret);
+//     return ret;
+// }
 
-void EpollSocket::add_bind_ip(std::string ip) {
-    _bind_ips.push_back(ip);
-}
+// void EpollSocket::add_bind_ip(std::string ip) {
+//     _bind_ips.push_back(ip);
+// }

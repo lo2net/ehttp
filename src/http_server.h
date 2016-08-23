@@ -11,9 +11,9 @@
 #include <string>
 #include <map>
 #include <set>
-#include "sys/epoll.h"
+//#include "sys/epoll.h"
 #include "json/json.h"
-#include "epoll_socket.h"
+#include "iocp_socket.h"
 #include "sim_parser.h"
 
 class HttpMethod {
@@ -40,11 +40,11 @@ struct Resource {
     json_handler_ptr json_ptr;
 };
 
-class HttpEpollWatcher : public EpollSocketWatcher {
+class HttpIOCPWatcher : public IOCPSocketWatcher {
     private:
         std::map<std::string, Resource> resource_map;
     public:
-        virtual ~HttpEpollWatcher() {}
+        virtual ~HttpIOCPWatcher() {}
 
         void add_mapping(std::string path, method_handler_ptr handler, HttpMethod method = GET_METHOD);
 
@@ -52,13 +52,14 @@ class HttpEpollWatcher : public EpollSocketWatcher {
 
         int handle_request(Request &request, Response &response);
 
-        virtual int on_accept(EpollContext &epoll_context) ;
+        virtual int on_accept(IOCPContext &iocp_context) ;
 
-        virtual int on_readable(int &epollfd, epoll_event &event) ;
+    virtual int on_readable(IOCPContext &iocp_context, LPPER_IO_DATA PerIoData) ;
 
-        virtual int on_writeable(EpollContext &epoll_context) ;
+    virtual int on_writeable(IOCPContext &iocp_context, LPPER_IO_DATA PerIoData);
+    int on_writeable_1(IOCPContext &iocp_context);
 
-        virtual int on_close(EpollContext &epoll_context) ;
+        virtual int on_close(IOCPContext &iocp_context) ;
 };
 
 
@@ -88,12 +89,13 @@ class HttpServer {
         
         void set_port(int port);
     private:
-        HttpEpollWatcher http_handler;
-        EpollSocket epoll_socket;
+        HttpIOCPWatcher http_handler;
+        IOCPSocket iocp_socket;
         int _backlog;
         int _max_events;
         int _port;
-        pthread_t _pid; // when start async
+    //pthread_t _pid; // when start async
+    HANDLE _pid;
 };
 
 #endif /* HTTP_SERVER_H_ */

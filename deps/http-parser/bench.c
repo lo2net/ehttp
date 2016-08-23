@@ -22,7 +22,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/time.h>
+//#include <sys/time.h>
+
+#include "gettimeofday_mock.h"
 
 static const char data[] =
     "POST /joyent/http-parser HTTP/1.1\r\n"
@@ -50,6 +52,22 @@ static int on_data(http_parser* p, const char *at, size_t length) {
   return 0;
 }
 
+static http_parser_settings settings;
+int init_dumb_0(http_parser_settings *settings)
+{
+    settings->on_message_begin = on_info;
+    settings->on_headers_complete = on_info;
+    settings->on_message_complete = on_info;
+    settings->on_header_field = on_data;
+    settings->on_header_value = on_data;
+    settings->on_url = on_data;
+    settings->on_status = on_data;
+    settings->on_body = on_data;
+    return 0;
+}
+int dumb_0 = init_dumb_0(&settings);
+
+#if 0
 static http_parser_settings settings = {
   .on_message_begin = on_info,
   .on_headers_complete = on_info,
@@ -60,6 +78,7 @@ static http_parser_settings settings = {
   .on_status = on_data,
   .on_body = on_data
 };
+#endif
 
 int bench(int iter_count, int silent) {
   struct http_parser parser;

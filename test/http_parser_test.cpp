@@ -8,6 +8,8 @@
 #include "http_parser.h"
 #include "simple_log.h"
 
+#include "../src/gettimeofday_mock.h"
+
 const std::string test_req = "GET /hello?name=aaa&kw=%E4%B8%89%E6%98%8E HTTP/1.1\r\n" \
                              "Host: api.yeelink.net\r\n" \
                              "U-ApiKey: 121234132432143\r\n" \

@@ -11,6 +11,8 @@
 #include "sim_parser.h"
 #include "http_parser.h"
 
+#include "gettimeofday_mock.h"
+
 #define MAX_REQ_SIZE 10485760
 #define EHTTP_VERSION "1.0.2"
 
@@ -324,7 +326,7 @@ int Request::parse_request(const char *read_buffer, int read_size) {
         return -1;
     }
     LOG_DEBUG("read from client: size:%d, content:%s", read_size, read_buffer);
-    ssize_t nparsed = http_parser_execute(&_parser, &_settings, read_buffer, read_size);
+    size_t nparsed = http_parser_execute(&_parser, &_settings, read_buffer, read_size);
     if (nparsed != read_size) {
         std::string err_msg = "unkonw";
         if (_parser.http_errno) {

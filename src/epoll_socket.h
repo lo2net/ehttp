@@ -1,98 +1,102 @@
-/*
- * tcp_epoll.h
- *
- *  Created on: Nov 10, 2014
- *      Author: liao
- */
+//
+// refer to iocp_epoll.h
+//
 
-#ifndef TCP_EPOLL_H_
-#define TCP_EPOLL_H_
+// /*
+//  * tcp_epoll.h
+//  *
+//  *  Created on: Nov 10, 2014
+//  *      Author: liao
+//  */
 
-#include "sys/epoll.h"
-#include <vector>
-#include <set>
-#include <string>
-#include "threadpool.h"
+// #ifndef TCP_EPOLL_H_
+// #define TCP_EPOLL_H_
 
-#define SS_WRITE_BUFFER_SIZE 4096
-#define SS_READ_BUFFER_SIZE 4096
+// #include "sys/epoll.h"
+// #include <vector>
+// #include <set>
+// #include <string>
+// #include "threadpool.h"
 
-#define WRITE_CONN_ALIVE 0
-#define WRITE_CONN_CLOSE 1
-#define WRITE_CONN_CONTINUE 2
+// #define SS_WRITE_BUFFER_SIZE 4096
+// #define SS_READ_BUFFER_SIZE 4096
 
-#define READ_OVER 0
-#define READ_CONTINUE 1
-#define READ_CLOSE -1
+// #define WRITE_CONN_ALIVE 0
+// #define WRITE_CONN_CLOSE 1
+// #define WRITE_CONN_CONTINUE 2
 
-class EpollContext {
-    public:
-        void *ptr;
-        int fd;
-        std::string client_ip;
-};
+// #define READ_OVER 0
+// #define READ_CONTINUE 1
+// #define READ_CLOSE -1
 
-typedef void (*ScheduleHandlerPtr)();
+// class EpollContext {
+//     public:
+//         void *ptr;
+//         int fd;
+//         std::string client_ip;
+// };
 
-class EpollSocketWatcher {
-    public:
-        virtual int on_accept(EpollContext &epoll_context) = 0;
+// typedef void (*ScheduleHandlerPtr)();
 
-        virtual int on_readable(int &epollfd, epoll_event &event) = 0;
+// class EpollSocketWatcher {
+//     public:
+//         virtual int on_accept(EpollContext &epoll_context) = 0;
 
-        /**
-         * return :
-         * if return value == 1, we will close the connection
-         * if return value == 2, we will continue to write
-         */
-        virtual int on_writeable(EpollContext &epoll_context) = 0;
+//         virtual int on_readable(int &epollfd, epoll_event &event) = 0;
 
-        virtual int on_close(EpollContext &epoll_context) = 0;
+//         /**
+//          * return :
+//          * if return value == 1, we will close the connection
+//          * if return value == 2, we will continue to write
+//          */
+//         virtual int on_writeable(EpollContext &epoll_context) = 0;
 
-};
+//         virtual int on_close(EpollContext &epoll_context) = 0;
 
-struct TaskData {
-    int epollfd;
-    epoll_event event;
-    EpollSocketWatcher *watcher;
-};
+// };
 
-int close_and_release(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_watcher);
+// struct TaskData {
+//     int epollfd;
+//     epoll_event event;
+//     EpollSocketWatcher *watcher;
+// };
 
-class EpollSocket {
-    private:
-        int setNonblocking(int fd);
+// int close_and_release(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_watcher);
 
-        int accept_socket(int sockfd, std::string &client_ip);
+// class EpollSocket {
+//     private:
+//         int setNonblocking(int fd);
 
-        int bind_on(unsigned int ip);
+//         int accept_socket(int sockfd, std::string &client_ip);
 
-        int listen_on();
+//         int bind_on(unsigned int ip);
 
-        int handle_accept_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_watcher);
+//         int listen_on();
 
-        int handle_readable_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_watcher);
+//         int handle_accept_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_watcher);
 
-        int handle_writeable_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_watcher);
+//         int handle_readable_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_watcher);
 
-        std::vector<std::string> _bind_ips;
-        int _backlog;
-        int _port;
-        std::set<int> _listen_sockets;
-        ThreadPool *_thread_pool;
-        bool _use_default_tp;
-    public:
-        EpollSocket();
+//         int handle_writeable_event(int &epollfd, epoll_event &event, EpollSocketWatcher &socket_watcher);
+
+//         std::vector<std::string> _bind_ips;
+//         int _backlog;
+//         int _port;
+//         std::set<int> _listen_sockets;
+//         ThreadPool *_thread_pool;
+//         bool _use_default_tp;
+//     public:
+//         EpollSocket();
        
-         ~EpollSocket();
+//          ~EpollSocket();
 
-        int start_epoll(int port, EpollSocketWatcher &socket_watcher, int backlog, int max_events);
+//         int start_epoll(int port, EpollSocketWatcher &socket_watcher, int backlog, int max_events);
 
-        void set_thread_pool(ThreadPool *tp);
+//         void set_thread_pool(ThreadPool *tp);
 
-        void set_schedule(ScheduleHandlerPtr h);
+//         void set_schedule(ScheduleHandlerPtr h);
 
-        void add_bind_ip(std::string ip);
-};
+//         void add_bind_ip(std::string ip);
+// };
 
-#endif /* TCP_EPOLL_H_ */
+// #endif /* TCP_EPOLL_H_ */

@@ -4,8 +4,9 @@
 #include <cstring>
 #include <string>
 #include <fstream>
-#include "sys/time.h"
-#include <pthread.h>
+//#include "sys/time.h"
+//#include <pthread.h>
+#include <windows.h> // CRITICAL_SECTION
 
 const int ERROR_LEVEL = 1;
 const int WARN_LEVEL = 2;
@@ -15,26 +16,27 @@ const int DEBUG_LEVEL = 4;
 // log config
 extern int log_level;
 
-#define LOG_ERROR(format, args...) \
+//*
+#define LOG_ERROR(format, ...) \
     if(log_level >= ERROR_LEVEL) { \
-		log_error("%s %s(%d): " format, "ERROR", __FILE__, __LINE__, ##args); \
+		log_error("%s %s(%d): " format, "ERROR", __FILE__, __LINE__, ##__VA_ARGS__); \
     }
 
-#define LOG_WARN(format, args...) \
+#define LOG_WARN(format, ...) \
     if(log_level >= WARN_LEVEL) { \
-		log_warn("%s %s(%d): " format, "WARN", __FILE__, __LINE__, ##args); \
+		log_warn("%s %s(%d): " format, "WARN", __FILE__, __LINE__, ##__VA_ARGS__); \
     }
 
-#define LOG_INFO(format, args...) \
+#define LOG_INFO(format, ...) \
     if(log_level >= INFO_LEVEL) { \
-		log_info("%s %s(%d): " format, "INFO", __FILE__, __LINE__, ##args); \
+		log_info("%s %s(%d): " format, "INFO", __FILE__, __LINE__, ##__VA_ARGS__); \
     }
 
-#define LOG_DEBUG(format, args...) \
+#define LOG_DEBUG(format, ...) \
     if(log_level >= DEBUG_LEVEL) { \
-		log_debug("%s %s(%d): " format, "DEBUG", __FILE__, __LINE__, ##args); \
+		log_debug("%s %s(%d): " format, "DEBUG", __FILE__, __LINE__, ##__VA_ARGS__); \
     }
-
+//*/
 
 std::string _get_show_time();
 
@@ -63,7 +65,8 @@ class FileAppender {
         long _last_sec;
         bool _is_inited;
         int _retain_day;
-        pthread_mutex_t writelock;
+    //pthread_mutex_t writelock;
+    CRITICAL_SECTION writelock;
 };
 
 #endif

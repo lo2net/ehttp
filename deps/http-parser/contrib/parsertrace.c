@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
   }
   fseek(file, 0, SEEK_SET);
 
-  char* data = malloc(file_length);
+  char* data = (char*)malloc(file_length);
   if (fread(data, 1, file_length, file) != (size_t)file_length) {
     fprintf(stderr, "couldn't read entire file\n");
     free(data);

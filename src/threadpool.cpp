@@ -1,19 +1,22 @@
 #include "threadpool.h"
-#include <sys/epoll.h>
-#include <sys/fcntl.h>
-#include <sys/sysinfo.h>
-#include <unistd.h>
+//#include <sys/epoll.h>
+//#include <sys/fcntl.h>
+//#include <sys/sysinfo.h>
+//#include <unistd.h>
 
 #include <errno.h>
 #include <string.h>
 #include "simple_log.h"
-#include "epoll_socket.h"
+//#include "epoll_socket.h"
 
-Task::Task() {}
+Task::Task(void (*fn_ptr)(void*), void* arg) : m_fn_ptr(fn_ptr), m_arg(arg)
+{}
 
 Task::~Task() {}
 
 void Task::run() {
+    (*m_fn_ptr)(m_arg);
+    /*
     LOG_DEBUG("start handle read task");
     EpollContext *epoll_context = (EpollContext *) event.data.ptr;
     int fd = epoll_context->fd;
@@ -33,6 +36,7 @@ void Task::run() {
     } else {
         LOG_ERROR("unkonw ret!");
     }
+    */
 }
 
 ThreadPool::ThreadPool() {
@@ -76,15 +80,20 @@ int ThreadPool::start()
         return 0;
     }
     m_pool_state = STARTED;
-    int ret = -1;
+    //int ret = -1;
     for (int i = 0; i < m_pool_size; i++) {
-        pthread_t tid;
-        ret = pthread_create(&tid, NULL, ss_start_thread, (void*) this);
-        if (ret != 0) {
-            LOG_ERROR("pthread_create() failed: %d", ret);
+        //pthread_t tid;
+        DWORD tid;
+        //ret = pthread_create(&tid, NULL, start_thread, (void*) this);
+        HANDLE ret = ::CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ss_start_thread, (void*)this, 0, &tid);
+        //if (ret != 0) {
+        if (ret == NULL) {
+            //LOG_ERROR("pthread_create() failed: %d", ret);
+            LOG_ERROR("pthread_create() failed: %d", ::GetLastError());
             return -1;
         }
-        m_threads.push_back(tid);
+        //m_threads.push_back(tid);
+        m_threads.push_back(ret);
     }
     LOG_DEBUG("%d threads created by the thread pool", m_pool_size);
 
@@ -115,10 +124,12 @@ int ThreadPool::destroy_threadpool()
     LOG_INFO("Broadcasting STOP signal to all threads...");
     m_task_cond_var.broadcast(); // notify all threads we are shttung down
 
-    int ret = -1;
+    //int ret = -1;
     for (int i = 0; i < m_pool_size; i++) {
         void* result;
-        ret = pthread_join(m_threads[i], &result);
+        //ret = pthread_join(m_threads[i], &result);
+        DWORD ret = ::WaitForSingleObject(m_threads[i], INFINITE);
+        // ret => WAIT_OBJECT_0
         LOG_DEBUG("pthread_join() returned %d", ret);
         m_task_cond_var.broadcast(); // try waking up a bunch of threads that are still waiting
     }
@@ -128,11 +139,11 @@ int ThreadPool::destroy_threadpool()
 
 void* ThreadPool::execute_thread()
 {
-    Task task;
-    LOG_DEBUG("Starting thread :%u", pthread_self());
+    Task *task = NULL;
+    LOG_DEBUG("Starting thread :%u", ::GetCurrentThreadId());
     while(true) {
         // Try to pick a task
-        LOG_DEBUG("Locking: %u", pthread_self());
+        LOG_DEBUG("Locking: %u", ::GetCurrentThreadId());
         m_task_mutex.lock();
 
         // We need to put pthread_cond_wait in a loop for two reasons:
@@ -144,32 +155,35 @@ void* ThreadPool::execute_thread()
         while ((m_pool_state != STOPPED) && (m_tasks.empty())) {
             // Wait until there is a task in the queue
             // Unlock mutex while wait, then lock it back when signaled
-            LOG_DEBUG("Unlocking and waiting: %u", pthread_self());
+            LOG_DEBUG("Unlocking and waiting: %u", ::GetCurrentThreadId());
             m_task_cond_var.wait(m_task_mutex.get_mutex_ptr());
-            LOG_DEBUG("Signaled and locking: %u", pthread_self());
+            LOG_DEBUG("Signaled and locking: %u", ::GetCurrentThreadId());
         }
 
         // If the thread was woken up to notify process shutdown, return from here
         if (m_pool_state == STOPPED) {
-            LOG_DEBUG("Unlocking and exiting: %u", pthread_self());
+            LOG_DEBUG("Unlocking and exiting: %u", ::GetCurrentThreadId());
             m_task_mutex.unlock();
-            pthread_exit(NULL);
+            //pthread_exit(NULL);
+            ::ExitThread(0);
         }
 
         task = m_tasks.front();
         m_tasks.pop_front();
-        LOG_DEBUG("Unlocking: %u", pthread_self());
+        LOG_DEBUG("Unlocking: %u", ::GetCurrentThreadId());
         m_task_mutex.unlock();
 
-        //cout << "Executing thread " << pthread_self() << endl;
+        //cout << "Executing thread " << ::GetCurrentThreadId() << endl;
         // execute the task
-        task.run(); //
-        //cout << "Done executing thread " << pthread_self() << endl;
+        task->run(); //
+        //cout << "Done executing thread " << ::GetCurrentThreadId() << endl;
+        delete task;
+        task = NULL;
     }
     return NULL;
 }
 
-int ThreadPool::add_task(Task task)
+int ThreadPool::add_task(Task *task)
 {
     m_task_mutex.lock();
 

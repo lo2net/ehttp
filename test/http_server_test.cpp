@@ -4,33 +4,36 @@
  *  Created on: Oct 26, 2014
  *      Author: liao
  */
+
+#include "http_server.h"
+
 #include <sstream>
 #include <cstdlib>
-#include <unistd.h>
+//#include <unistd.h>
 #include "simple_log.h"
-#include "http_server.h"
+//#include "http_server.h"
 #include "threadpool.h"
 
-pthread_key_t g_tp_key;
+// pthread_key_t g_tp_key;
 
-void a_test_fn() {
-    pthread_t t = pthread_self();
-    LOG_INFO("start thread data function , tid:%u", t);
-    unsigned long *a = new unsigned long();
-    *a = t;
+// void a_test_fn() {
+//     pthread_t t = pthread_self();
+//     LOG_INFO("start thread data function , tid:%u", t);
+//     unsigned long *a = new unsigned long();
+//     *a = t;
 
-    pthread_setspecific(g_tp_key, a);
-}
+//     pthread_setspecific(g_tp_key, a);
+// }
 
 void hello(Request &request, Json::Value &root) {
 	root["hello"] = "world";
-    pthread_t t = pthread_self();
-    int *tmp = (int*)pthread_getspecific(g_tp_key);
-    if (tmp == NULL) {
-        LOG_INFO("not thread data, tid:%u", t);
-        return;
-    }
-    LOG_INFO("get thread data:%lu", *tmp);
+    // pthread_t t = pthread_self();
+    // int *tmp = (int*)pthread_getspecific(g_tp_key);
+    // if (tmp == NULL) {
+    //     LOG_INFO("not thread data, tid:%u", t);
+    //     return;
+    // }
+    // LOG_INFO("get thread data:%lu", *tmp);
 }
 
 void sayhello(Request &request, Json::Value &root) {
@@ -58,7 +61,10 @@ void usleep(Request &request, Response &response) {
         response.set_body(root);
         return;
     }
-    usleep(atoi(sleep_time.c_str()));
+
+    //usleep(atoi(sleep_time.c_str()));
+    ::Sleep(atoi(sleep_time.c_str()));
+
     root["code"] = 0;
     root["msg"] = "success!";
     response.set_body(root);
@@ -89,7 +95,7 @@ int main(int argc, char **args) {
     http_server.add_mapping("/sayhello", sayhello);
     http_server.add_mapping("/login", login, GET_METHOD | POST_METHOD);
 
-    http_server.add_bind_ip("127.0.0.1");
+    //http_server.add_bind_ip("127.0.0.1");
     http_server.set_port(atoi(args[1]));
     http_server.set_backlog(100000);
     http_server.set_max_events(100000);

@@ -6,14 +6,20 @@
 #include <string>
 #include <time.h>
 #include <sys/stat.h>
-#include <sys/time.h>
+//#include <sys/time.h>
 #include "stdarg.h"
 #include <signal.h>
 #include <errno.h>
-#include <unistd.h>
+//#include <unistd.h>
+
+#include "direct.h" // _mkdir
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "simple_config.h"
 #include "simple_log.h"
+
+#include "gettimeofday_mock.h"
 
 // log context
 const int MAX_SINGLE_LOG_SIZE = 2048;
@@ -34,11 +40,14 @@ FileAppender::~FileAppender() {
     if (_fs.is_open()) {
         _fs.close();
     }
+
+    ::DeleteCriticalSection(&writelock);
 }
 
 int FileAppender::init(std::string dir, std::string log_file) {
     if (!dir.empty()) {
-        int ret = mkdir(dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        //int ret = mkdir(dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        int ret = _mkdir(dir.c_str());
         if (ret != 0 && errno != EEXIST) {
             printf("mkdir error which dir:%s err:%s\n", dir.c_str(), strerror(errno));
             _is_inited = true;
@@ -52,18 +61,22 @@ int FileAppender::init(std::string dir, std::string log_file) {
     _log_file_path = dir + "/" + log_file;
     _fs.open(_log_file_path.c_str(), std::fstream::out | std::fstream::app);
     _is_inited = true;
-    pthread_mutex_init(&writelock, NULL);
+    //pthread_mutex_init(&writelock, NULL);
+    ::InitializeCriticalSection(&writelock);
+
     return 0;
 }
 
 int FileAppender::write_log(char *log, const char *format, va_list ap) {
-    pthread_mutex_lock(&writelock);
+    //pthread_mutex_lock(&writelock);
+    ::EnterCriticalSection(&writelock);
     if (_fs.is_open()) {
         vsnprintf(log, MAX_SINGLE_LOG_SIZE - 1, format, ap);
         _fs << log << "\n";
         _fs.flush();
     }
-    pthread_mutex_unlock(&writelock);
+    //pthread_mutex_unlock(&writelock);
+    ::LeaveCriticalSection(&writelock);
     return 0;
 }
 
@@ -75,25 +88,32 @@ int FileAppender::shift_file_if_need(struct timeval tv, struct timezone tz) {
     long fix_now_sec = tv.tv_sec - tz.tz_minuteswest * 60;
     long fix_last_sec = _last_sec - tz.tz_minuteswest * 60;
     if (fix_now_sec / ONE_DAY_SECONDS - fix_last_sec / ONE_DAY_SECONDS) {
-        pthread_mutex_lock(&writelock);
+        //pthread_mutex_lock(&writelock);
+        ::EnterCriticalSection(&writelock);
 
         struct tm *tm;
-        time_t y_sec = tv.tv_sec - ONE_DAY_SECONDS;
-        tm = localtime(&y_sec); //yesterday
+        __time32_t y_sec = tv.tv_sec - ONE_DAY_SECONDS;
+        tm = _localtime32(&y_sec); //yesterday
         char new_file[100];
-        bzero(new_file, 100);
+        //bzero(new_file, 100);
+        memset(new_file, 0, 100);
+        
         sprintf(new_file, "%s.%04d-%02d-%02d",
                 _log_file.c_str(),
                 tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
         std::string new_file_path = _log_dir + "/" + new_file;
-        if (access(new_file_path.c_str(), F_OK) != 0) {
+        //if (access(new_file_path.c_str(), F_OK) != 0) {
+        struct _stat stat;
+        if(-1==_stat(_log_file_path.c_str(), &stat) && errno==ENOENT) {
+
             rename(_log_file_path.c_str(), new_file_path.c_str());
             // reopen new log file
             _fs.close();
             _fs.open(_log_file_path.c_str(), std::fstream::out | std::fstream::app);
         }
 
-        pthread_mutex_unlock(&writelock);
+        //pthread_mutex_unlock(&writelock);
+        ::LeaveCriticalSection(&writelock);
 
         delete_old_log(tv);
     }
@@ -120,7 +140,7 @@ int FileAppender::delete_old_log(timeval tv) {
     char old_file[100];
     memset(old_file, 0, 100);
     struct tm *tm;
-    tm = localtime(&old_tv.tv_sec);
+    tm = _localtime32((const __time32_t*)&old_tv.tv_sec);
     sprintf(old_file, "%s.%04d-%02d-%02d",
             _log_file.c_str(), tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday - 1);
     std::string old_file_path = _log_dir + "/" + old_file;
@@ -165,7 +185,7 @@ std::string _get_show_time(timeval tv) {
 	memset(show_time, 0, 40);
 
 	struct tm *tm;
-	tm = localtime(&tv.tv_sec);
+	tm = _localtime32((const __time32_t*)&tv.tv_sec);
 
 	sprintf(show_time, "%04d-%02d-%02d %02d:%02d:%02d.%03d",
 			tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
@@ -173,6 +193,7 @@ std::string _get_show_time(timeval tv) {
 	return std::string(show_time);
 }
 
+#define strcasecmp _stricmp
 int _get_log_level(const char *level_str) {
 	if(strcasecmp(level_str, "ERROR") == 0) {
 		return ERROR_LEVEL;
@@ -206,14 +227,16 @@ void _log(const char *format, va_list ap) {
 
     g_file_appender.shift_file_if_need(now, tz);
     char single_log[MAX_SINGLE_LOG_SIZE];
-    bzero(single_log, MAX_SINGLE_LOG_SIZE);
+    //bzero(single_log, MAX_SINGLE_LOG_SIZE);
+    memset(single_log, 0, MAX_SINGLE_LOG_SIZE);
+    
     g_file_appender.write_log(single_log, fin_format.c_str(), ap);
 }
 
 int log_init(std::string dir, std::string file) {
     g_dir = dir;
     g_config_file = file;
-    signal(SIGUSR1, sigreload);
+    //signal(SIGUSR1, sigreload);
     return _check_config_file();
 }
 
